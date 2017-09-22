@@ -6212,6 +6212,14 @@ void test_client_server_connect()
 
     check( client_num_packets_received >= 10 && server_num_packets_received >= 10 );
 
+    // Very basic test for checking if each match only has 2 or less clients connected.
+    // TODO:  Move to seperate test, can possibly use quit a bit from this test?
+    skillz_match_t * m;
+    for( m = server->matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
+    {
+        check( m->num_clients_in_match <= server->max_clients_per_match );
+    }
+
     netcode_server_destroy( server );
 
     netcode_client_destroy( client );
@@ -6516,8 +6524,17 @@ void test_client_server_multiple_clients()
         
         netcode_network_simulator_reset( network_simulator );
 
+        // Very basic test for checking if each match only has 2 or less clients connected.
+        // TODO:  Move to seperate test, can possibly use quit a bit from this test?
+        skillz_match_t * m;
+        for( m = server->matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
+        {
+        check( m->num_clients_in_match <= server->max_clients_per_match );
+        }
+
         for ( j = 0; j < max_clients[i]; ++j )
         {
+            // TODO: add test here to see that each match gets removed properly.
             netcode_client_destroy( client[j] );
         }
 
