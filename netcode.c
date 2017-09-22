@@ -4051,24 +4051,24 @@ int netcode_server_find_free_client_index( struct netcode_server_t * server )
  */
 int skillz_add_client_to_match(struct netcode_server_t * server, int skillz_match_id, uint64_t client_id)
 {
-    skillz_match_t * m;
+    skillz_match_t * match;
 
-    HASH_FIND_INT(server->matches, &skillz_match_id, m);
+    HASH_FIND_INT(server->matches, &skillz_match_id, match);
 
     // If null then match does not exist.  Create match, add user.
-    if ( m == NULL )
+    if ( match == NULL )
     {
-        m = ( struct skillz_match_t * ) malloc( sizeof( skillz_match_t ) );
-        if ( !m )
+        match = ( struct skillz_match_t * ) malloc( sizeof( skillz_match_t ) );
+        if ( !match )
         {
             // TODO: What should happen here.  Possibly disconnect client from server and try to get a new match id?
             netcode_printf( NETCODE_LOG_LEVEL_ERROR, "malloc failed while creating match &d\n", skillz_match_id );
             return 0;
         }
-        m->skillz_match_id = skillz_match_id;
-        m->clients_in_match[0] = client_id;
-        m->num_clients_in_match = 1;
-        HASH_ADD_INT( server->matches, skillz_match_id, m );
+        match->skillz_match_id = skillz_match_id;
+        match->clients_in_match[0] = client_id;
+        match->num_clients_in_match = 1;
+        HASH_ADD_INT( server->matches, skillz_match_id, match );
 
         netcode_printf( NETCODE_LOG_LEVEL_INFO, "match %d created\n", skillz_match_id );
         netcode_printf( NETCODE_LOG_LEVEL_INFO, "client %d added to match %d\n", client_id, skillz_match_id );
@@ -4077,21 +4077,21 @@ int skillz_add_client_to_match(struct netcode_server_t * server, int skillz_matc
     }
     else
     {
-        if ( m->num_clients_in_match <= 0 )
+        if ( match->num_clients_in_match <= 0 )
         {
             netcode_printf( NETCODE_LOG_LEVEL_ERROR, "match %d was already created with %d clients\n",
-                            m->skillz_match_id, m->num_clients_in_match );
+                            match->skillz_match_id, match->num_clients_in_match );
             return 0;
         }
-        if ( m->num_clients_in_match >= server->max_clients_per_match )
+        if ( match->num_clients_in_match >= server->max_clients_per_match )
         {
             netcode_printf( NETCODE_LOG_LEVEL_ERROR, "client %d tried to join match %d with %d clients already connected\n",
-                            client_id, skillz_match_id, m->num_clients_in_match );
+                            client_id, skillz_match_id, match->num_clients_in_match );
             return 0;
         }
 
-        m->clients_in_match[m->num_clients_in_match] = client_id;
-        m->num_clients_in_match++;
+        match->clients_in_match[match->num_clients_in_match] = client_id;
+        match->num_clients_in_match++;
 
         netcode_printf( NETCODE_LOG_LEVEL_INFO, "client %d added to match %d\n", client_id, skillz_match_id );
 
@@ -4109,16 +4109,16 @@ int skillz_add_client_to_match(struct netcode_server_t * server, int skillz_matc
  */
 void skillz_print_all_matches(struct netcode_server_t * server)
 {
-    skillz_match_t * m;
+    skillz_match_t * match;
 
     netcode_printf( NETCODE_LOG_LEVEL_INFO, "\n\nPrinting the matches and their clients.\n" );
     int i;
-    for( m = server->matches; m != NULL; m = ( skillz_match_t * )( m->hh.next ) )
+    for( match = server->matches; match != NULL; match = ( skillz_match_t * )( match->hh.next ) )
     {
-        for( i = 0; i < m->num_clients_in_match; ++i)
+        for( i = 0; i < match->num_clients_in_match; ++i)
         {
             netcode_printf( NETCODE_LOG_LEVEL_INFO, "match id: %d client id: %d clients in match: %d\n",
-                    m->skillz_match_id, m->clients_in_match[i], m->num_clients_in_match );
+                    match->skillz_match_id, match->clients_in_match[i], match->num_clients_in_match );
         }
     }
     netcode_printf( NETCODE_LOG_LEVEL_INFO, "\n\n" );

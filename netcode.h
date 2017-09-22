@@ -103,10 +103,10 @@ extern "C" {
 // SKILLZ_TOURNAMENT_T
 typedef struct skillz_match_t
 {
-    int skillz_match_id;		/* key */
-    uint64_t clients_in_match[SKILLZ_MAX_CLIENTS_PER_MATCH];
-    int num_clients_in_match;
-    UT_hash_handle hh;			/* Makes this structure hashable!! */
+    int 			skillz_match_id;		/* key */
+    uint64_t 		clients_in_match[SKILLZ_MAX_CLIENTS_PER_MATCH];
+    int 			num_clients_in_match;
+    UT_hash_handle 	hh;						/* Makes this structure hashable!! */
 
 } skillz_match_t;
 
