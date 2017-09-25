@@ -99,6 +99,7 @@ extern "C" {
   **/
 
 #define SKILLZ_MAX_CLIENTS_PER_MATCH 2
+#define SKILLZ_MAX_MATCHES ( (int) (NETCODE_MAX_CLIENTS) / ( 2 ) )
 
 // SKILLZ_TOURNAMENT_T
 typedef struct skillz_match_t
