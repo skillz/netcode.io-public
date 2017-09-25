@@ -6716,6 +6716,7 @@ void test_client_server_multiple_servers()
             check( m->num_clients_in_match <= server->max_clients_per_match );
         }
 
+        skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
         {
             if ( netcode_server_client_connected( server, 0 ) )
