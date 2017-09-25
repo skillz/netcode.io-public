@@ -6245,11 +6245,30 @@ void test_client_server_connect()
             netcode_server_free_packet( server, packet );
         }
 
+        // Very basic test for checking if each match only has 2 or less clients connected.
+        skillz_match_t * m;
+        for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
+        {
+            check( m->num_clients_in_match <= server->max_clients_per_match );
+        }
+
+        skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
         {
             if ( netcode_server_client_connected( server, 0 ) )
             {
+                // Skillz test for match purge.
+                HASH_FIND_INT( server->skillz_matches,
+                               &( server->skillz_match_id[0] ),
+                               match);
+                check( match != NULL );
+
                 netcode_server_disconnect_client( server, 0 );
+
+                HASH_FIND_INT( server->skillz_matches,
+                               &( server->skillz_match_id[0] ),
+                               match );
+                check( match == NULL );
             }
         }
 
@@ -6260,14 +6279,6 @@ void test_client_server_connect()
     }
 
     check( client_num_packets_received >= 10 && server_num_packets_received >= 10 );
-
-    // Very basic test for checking if each match only has 2 or less clients connected.
-    // TODO:  Move to seperate test, can possibly use quit a bit from this test?
-    skillz_match_t * m;
-    for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
-    {
-        check( m->num_clients_in_match <= server->max_clients_per_match );
-    }
 
     netcode_server_destroy( server );
 
