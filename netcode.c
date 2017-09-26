@@ -3921,7 +3921,7 @@ void netcode_server_disconnect_all_clients( struct netcode_server_t * server )
  */
 void skillz_clear_matches( struct netcode_server_t * server )
 {
-    skillz_match_t * current_match, * tmp;
+    skillz_match_t * current_match = NULL, * tmp = NULL;
 
     HASH_ITER( hh, server->skillz_matches, current_match, tmp )
     {
@@ -4205,16 +4205,16 @@ void netcode_server_connect_client( struct netcode_server_t * server,
     char address_string[NETCODE_MAX_ADDRESS_STRING_LENGTH];
 
     /* TODO: try to find a way to deliver match id. */
-    int testId = 0;
+    int test_id = 0;
     if( server->num_connected_clients >= 3 )
     {
-        testId = 222;
+        test_id = 222;
     }
     else
     {
-        testId = 111;
+        test_id = 111;
     }
-    if ( !skillz_add_client_to_match( server, testId, client_id, client_index ) )
+    if ( !skillz_add_client_to_match( server, test_id, client_id, client_index ) )
     {
         netcode_printf( NETCODE_LOG_LEVEL_ERROR, "failed to add client %d to match %d\n",
                         client_id, 0);
@@ -6139,6 +6139,16 @@ void test_replay_protection()
     }
 }
 
+void check_num_clients_in_matches(struct netcode_server_t * server)
+{
+    // Very basic test for checking if each match only has 2 or less clients connected.
+    skillz_match_t * m;
+    for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
+    {
+        check( m->num_clients_in_match <= server->max_clients_per_match );
+    }
+}
+
 static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
                                                   0x9a, 0x65, 0x62, 0xf6, 0x6f, 0x2b, 0x30, 0xe4, 
                                                   0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
@@ -6247,12 +6257,7 @@ void test_client_server_connect()
             netcode_server_free_packet( server, packet );
         }
 
-        // Very basic test for checking if each match only has 2 or less clients connected.
-        skillz_match_t * m;
-        for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
-        {
-            check( m->num_clients_in_match <= server->max_clients_per_match );
-        }
+        check_num_clients_in_matches(server);
 
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
@@ -6586,6 +6591,8 @@ void test_client_server_multiple_clients()
         
         netcode_network_simulator_reset( network_simulator );
 
+        check_num_clients_in_matches(server);
+      
         for ( j = 0; j < max_clients[i]; ++j )
         {
             netcode_client_destroy( client[j] );
@@ -6702,6 +6709,8 @@ void test_client_server_multiple_servers()
             server_num_packets_received++;
             netcode_server_free_packet( server, packet );
         }
+
+        check_num_clients_in_matches(server);
 
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
