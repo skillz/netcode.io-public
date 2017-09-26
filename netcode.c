@@ -6824,13 +6824,6 @@ void test_client_server_multiple_servers()
             netcode_server_free_packet( server, packet );
         }
 
-        // Very basic test for checking if each match only has 2 or less clients connected.
-        skillz_match_t * m;
-        for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
-        {
-            check( m->num_clients_in_match <= server->max_clients_per_match );
-        }
-
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
         {
