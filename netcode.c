@@ -6305,8 +6305,10 @@ void test_skillz_add_two_clients_to_match()
 
     struct netcode_server_t * server = netcode_server_create_internal("[::1]:40000", TEST_PROTOCOL_ID, private_key, time, network_simulator, NULL, NULL, NULL );
     check( server );
+    netcode_server_start( server, num_clients );
 
     struct netcode_client_t ** clients = (struct netcode_client_t **) malloc( sizeof( struct netcode_client_t* ) * num_clients );
+    check(clients);
 
     uint64_t token_sequence = 0;
 
@@ -6317,6 +6319,7 @@ void test_skillz_add_two_clients_to_match()
         sprintf( client_address, "[::]:%d", 50000 + i );
 
         *(clients + i) = netcode_client_create_internal( client_address, time, network_simulator, NULL, NULL, NULL );
+
 
         check( clients[i] );
 
@@ -6361,8 +6364,11 @@ void test_skillz_add_two_clients_to_match()
                 break;
 
             if( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED )
-                break;
+                num_connected_clients++;
         }
+
+        if ( num_connected_clients == num_clients )
+            break;
 
         time += delta_time;
     }
@@ -6375,90 +6381,10 @@ void test_skillz_add_two_clients_to_match()
         check( netcode_server_client_connected( server, j ) == 1 );
     }
 
-    // This is the packet stuff that needs to be done so that the match stuff gets triggered.
+    check( server->skillz_matches->num_clients_in_match == num_clients );
 
-    //int * server_num_packets_received = (int *) malloc( sizeof(int) * 2 );
-    //int * client_num_packets_received = (int *) malloc( sizeof(int) * 2 );
-
-    //uint8_t packet_data[NETCODE_MAX_PACKET_SIZE];
-    //for( int i = 0; i < NETCODE_MAX_PACKET_SIZE; ++i )
-    //    packet_data[i] = (uint8_t) i;
-
-    //while ( 1 )
-    //{
-    //    netcode_network_simulator_update( network_simulator, time );
-
-    //    netcode_client_update( client1, time );
-    //    netcode_client_update( client2, time );
-
-    //    netcode_server_update( server, time );
-
-    //    netcode_client_send_packet( client1, packet_data, NETCODE_MAX_PACKET_SIZE );
-    //    netcode_server_send_packet( server, 0, packet_data, NETCODE_MAX_PACKET_SIZE );
-
-    //    netcode_client_send_packet( client2, packet_data, NETCODE_MAX_PACKET_SIZE );
-    //    netcode_server_send_packet( server, 1, packet_data, NETCODE_MAX_PACKET_SIZE );
-
-    //    for( int j = 0; i < num_clients; ++j )
-    //    {
-    //        while ( 1 )
-    //        {
-    //            int packet_bytes;
-    //            uint64_t packet_sequence;
-    //            uint8_t * packet = netcode_client_receive_packet( clients[j], &packet_bytes, &packet_sequence );
-    //            if( !packet )
-    //                break;
-    //            (void) packet_sequence;
-    //            netcode_assert( packet_bytes == NETCODE_MAX_PACKET_SIZE );
-    //            netcode_assert( memcmp( packet, packet_data, NETCODE_MAX_PACKET_SIZE ) == 0 );
-    //            client_num_packets_received[j]++;
-    //            netcode_client_free_packet( clients[j], packet );
-    //        }
-    //    }
-
-    //    for( int j = 0; j < num_clients; ++j )
-    //    {
-    //        while( 1 )
-    //        {
-    //            int packet_bytes;
-    //            uint64_t packet_sequence;
-    //            void * packet = netcode_server_receive_packet( server, j, &packet_bytes, &packet_sequence );
-    //            if( !packet )
-    //                break;
-    //            (void) packet_sequence;
-    //            netcode_assert( packet_bytes == NETCODE_MAX_PACKET_SIZE );
-    //            netcode_assert( memcpy( packet, packet_data, NETCODE_MAX_PACKET_SIZE ) == 0 );
-    //            server_num_packets_received[j]++;
-    //            netcode_server_free_packet( server, packet );
-    //        }
-    //    }
-
-    //    int num_clients_ready = 0;
-
-    //    for( int j = 0; j < num_clients; ++j )
-    //    {
-    //        if( client_num_packets_received[j] >= 1 && server_num_packets_received[j] >= 1 )
-    //        {
-    //            num_clients_ready++;
-    //        }
-    //    }
-
-    //    check( num_clients_ready == num_clients );
-
-    //    // ADD THE MATCH STUFF HERE.
-    //    printf("HELLO");
-
-    //    for( int j = 0; j < num_clients; ++j )
-    //    {
-    //        if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
-    //            break;
-    //    }
-
-    //    time += delta_time;
-    //}
-
-    //free( server_num_packets_received );
-    //free( client_num_packets_received );
+    for( int i = 0; i < num_clients; ++i )
+        netcode_server_disconnect_client( server, i );
 
     for( int i = 0; i < num_clients; ++i )
         free( clients[i] );
