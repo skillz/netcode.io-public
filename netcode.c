@@ -6139,7 +6139,7 @@ void test_replay_protection()
     }
 }
 
-void match_test_helper(netcode_server_t * server)
+void check_num_clients_in_matches(netcode_server_t * server)
 {
     // Very basic test for checking if each match only has 2 or less clients connected.
     skillz_match_t * m;
@@ -6257,7 +6257,8 @@ void test_client_server_connect()
             netcode_server_free_packet( server, packet );
         }
 
-        match_test_helper(server);
+        check_num_clients_in_matches(server)
+
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
         {
@@ -6590,7 +6591,7 @@ void test_client_server_multiple_clients()
         
         netcode_network_simulator_reset( network_simulator );
 
-        match_test_helper( server );
+        check_num_clients_in_matches(server)
 
         for ( j = 0; j < max_clients[i]; ++j )
         {
@@ -6709,12 +6710,7 @@ void test_client_server_multiple_servers()
             netcode_server_free_packet( server, packet );
         }
 
-        // Very basic test for checking if each match only has 2 or less clients connected.
-        skillz_match_t * m;
-        for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
-        {
-            check( m->num_clients_in_match <= server->max_clients_per_match );
-        }
+        check_num_clients_in_matches(server)
 
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
