@@ -6139,7 +6139,7 @@ void test_replay_protection()
     }
 }
 
-void check_num_clients_in_matches(netcode_server_t * server)
+void check_num_clients_in_matches(struct netcode_server_t * server)
 {
     // Very basic test for checking if each match only has 2 or less clients connected.
     skillz_match_t * m;
