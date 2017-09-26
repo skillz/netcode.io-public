@@ -6257,7 +6257,7 @@ void test_client_server_connect()
             netcode_server_free_packet( server, packet );
         }
 
-        check_num_clients_in_matches(server)
+        check_num_clients_in_matches(server);
 
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
@@ -6591,7 +6591,7 @@ void test_client_server_multiple_clients()
         
         netcode_network_simulator_reset( network_simulator );
 
-        check_num_clients_in_matches(server)
+        check_num_clients_in_matches(server);
 
         for ( j = 0; j < max_clients[i]; ++j )
         {
@@ -6710,7 +6710,7 @@ void test_client_server_multiple_servers()
             netcode_server_free_packet( server, packet );
         }
 
-        check_num_clients_in_matches(server)
+        check_num_clients_in_matches(server);
 
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
