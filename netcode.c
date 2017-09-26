@@ -3921,7 +3921,7 @@ void netcode_server_disconnect_all_clients( struct netcode_server_t * server )
  */
 void skillz_clear_matches( struct netcode_server_t * server )
 {
-    skillz_match_t * current_match, * tmp;
+    skillz_match_t * current_match = NULL, * tmp = NULL;
 
     HASH_ITER( hh, server->skillz_matches, current_match, tmp )
     {
