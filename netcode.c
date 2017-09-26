@@ -4205,16 +4205,16 @@ void netcode_server_connect_client( struct netcode_server_t * server,
     char address_string[NETCODE_MAX_ADDRESS_STRING_LENGTH];
 
     /* TODO: try to find a way to deliver match id. */
-    int testId = 0;
+    int test_id = 0;
     if( server->num_connected_clients >= 3 )
     {
-        testId = 222;
+        test_id = 222;
     }
     else
     {
-        testId = 111;
+        test_id = 111;
     }
-    if ( !skillz_add_client_to_match( server, testId, client_id, client_index ) )
+    if ( !skillz_add_client_to_match( server, test_id, client_id, client_index ) )
     {
         netcode_printf( NETCODE_LOG_LEVEL_ERROR, "failed to add client %d to match %d\n",
                         client_id, 0);
