@@ -8261,6 +8261,7 @@ void netcode_test()
         RUN_TEST( test_loopback );
         RUN_TEST( test_skillz_add_two_clients_to_match );
         RUN_TEST( test_skillz_only_two_clients_per_match_with_three_attempting );
+        RUN_TEST( test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients );
     }
 }
 
