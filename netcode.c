@@ -3491,13 +3491,13 @@ struct netcode_server_t
     int running;
     int max_clients;
     int num_connected_clients;
-    int max_clients_per_match;											/* Max clients per match */
+    int max_clients_per_match;
     uint64_t global_sequence;
     uint8_t private_key[NETCODE_KEY_BYTES];
     uint64_t challenge_sequence;
     uint8_t challenge_key[NETCODE_KEY_BYTES];
-    skillz_match_t * skillz_matches;									/* Matches hash table */
-    int skillz_match_id[NETCODE_MAX_CLIENTS];							/* Index using client_index, much like client_id */
+    skillz_match_t * skillz_matches;
+    int skillz_match_id[NETCODE_MAX_CLIENTS];
     int client_connected[NETCODE_MAX_CLIENTS];
     int client_timeout[NETCODE_MAX_CLIENTS];
     int client_loopback[NETCODE_MAX_CLIENTS];
@@ -3769,10 +3769,9 @@ void skillz_print_all_matches( struct netcode_server_t * server )
     skillz_match_t * match;
 
     netcode_printf( NETCODE_LOG_LEVEL_INFO, "\n\nPrinting the matches and their clients.\n" );
-    int i;
     for( match = server->skillz_matches; match != NULL; match = ( skillz_match_t * )( match->hh.next ) )
     {
-        for( i = 0; i < match->num_clients_in_match; ++i)
+        for( int i = 0; i < match->num_clients_in_match; ++i)
         {
             netcode_printf( NETCODE_LOG_LEVEL_INFO, "match id: %d client id: %d clients in match: %d\n",
                     match->skillz_match_id, match->clients_in_match[i], match->num_clients_in_match );
@@ -3821,7 +3820,6 @@ void netcode_server_disconnect_client_internal( struct netcode_server_t * server
     netcode_assert( client_index < server->max_clients );
     netcode_assert( server->client_connected[client_index] );
     netcode_assert( !server->client_loopback[client_index] );
-    //netcode_assert( server->skillz_matches );
 
     netcode_printf( NETCODE_LOG_LEVEL_INFO, "server disconnected client %d\n", client_index );
 
@@ -4206,12 +4204,16 @@ void netcode_server_connect_client( struct netcode_server_t * server,
 
     char address_string[NETCODE_MAX_ADDRESS_STRING_LENGTH];
 
-    /* TODO: try to find a way to deliver match itd. */
+    /* TODO: try to find a way to deliver match id. */
     int testId = 0;
     if( server->num_connected_clients >= 3 )
+    {
         testId = 222;
+    }
     else
+    {
         testId = 111;
+    }
     if ( !skillz_add_client_to_match( server, testId, client_id, client_index ) )
     {
         netcode_printf( NETCODE_LOG_LEVEL_ERROR, "failed to add client %d to match %d\n",
