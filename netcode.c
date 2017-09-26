@@ -8010,10 +8010,13 @@ void test_skillz_add_two_clients_to_match()
     check( match->num_clients_in_match == num_clients );
 
     for( int i = 0; i < num_clients; ++i )
+    {
         netcode_server_disconnect_client( server, i );
-
+    }
     for( int i = 0; i < num_clients; ++i )
+    {
         netcode_client_destroy( clients[i] );
+    }
 
     // Check if match was destroyed after disconnection.
     HASH_FIND_INT( server->skillz_matches, &match_id, match );
@@ -8029,6 +8032,54 @@ void test_skillz_add_two_clients_to_match()
 
 void test_skillz_only_two_clients_per_match_with_three_attempting()
 {
+    struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL );
+
+    network_simulator->latency_milliseconds = 250;
+    network_simulator->jitter_milliseconds = 250;
+    network_simulator->packet_loss_percent = 5;
+    network_simulator->duplicate_packet_percent = 10;
+
+    double time = 0.0;
+
+    int num_clients = 3;
+
+    struct netcode_server_t * server = netcode_server_create_internal("[::1]:40000", TEST_PROTOCOL_ID, private_key, time, network_simulator, NULL, NULL, NULL );
+    check( server );
+    netcode_server_start( server, num_clients );
+
+    struct netcode_client_t ** clients = (struct netcode_client_t **) malloc( sizeof( struct netcode_client_t* ) * num_clients );
+    check(clients);
+
+    for(int i = 0; i < num_clients; ++i )
+    {
+        char client_address[NETCODE_MAX_ADDRESS_STRING_LENGTH];
+        sprintf( client_address, "[::]:%d", 50000 + i );
+
+        clients[i] = netcode_client_create_internal( client_address, time, network_simulator, NULL, NULL, NULL );
+        server->client_id[i] = i;
+    }
+
+    int match_id = 111;
+    for(int i = 0; i < num_clients; ++i )
+    {
+        skillz_add_client_to_match( server, match_id, server->client_id[i], i );
+    }
+
+    skillz_match_t * match = NULL;
+    HASH_FIND_INT( server->skillz_matches, &match_id, match  );
+    check( match->num_clients_in_match == num_clients - 1 );
+
+    for( int i = 0; i < num_clients; ++i )
+    {
+        netcode_client_destroy( clients[i] );
+    }
+
+    netcode_server_stop( server );
+    netcode_server_destroy( server );
+
+    netcode_network_simulator_destroy( network_simulator );
+
+    free( clients );
 }
 
 void test_skillz_disconnect_frees_match()
@@ -8083,6 +8134,7 @@ void netcode_test()
         RUN_TEST( test_disable_timeout );
         RUN_TEST( test_loopback );
         RUN_TEST( test_skillz_add_two_clients_to_match );
+        RUN_TEST( test_skillz_only_two_clients_per_match_with_three_attempting );
     }
 }
 
