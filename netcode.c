@@ -6139,6 +6139,16 @@ void test_replay_protection()
     }
 }
 
+void match_test_helper(netcode_server_t * server)
+{
+    // Very basic test for checking if each match only has 2 or less clients connected.
+    skillz_match_t * m;
+    for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
+    {
+        check( m->num_clients_in_match <= server->max_clients_per_match );
+    }
+}
+
 static uint8_t private_key[NETCODE_KEY_BYTES] = { 0x60, 0x6a, 0xbe, 0x6e, 0xc9, 0x19, 0x10, 0xea, 
                                                   0x9a, 0x65, 0x62, 0xf6, 0x6f, 0x2b, 0x30, 0xe4, 
                                                   0x43, 0x71, 0xd6, 0x2c, 0xd1, 0x99, 0x27, 0x26,
@@ -6247,13 +6257,7 @@ void test_client_server_connect()
             netcode_server_free_packet( server, packet );
         }
 
-        // Very basic test for checking if each match only has 2 or less clients connected.
-        skillz_match_t * m;
-        for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
-        {
-            check( m->num_clients_in_match <= server->max_clients_per_match );
-        }
-
+        match_test_helper(server);
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
         {
@@ -6586,13 +6590,7 @@ void test_client_server_multiple_clients()
         
         netcode_network_simulator_reset( network_simulator );
 
-        // Very basic test for checking if each match only has 2 or less clients connected.
-        // TODO:  Move to seperate test, can possibly use quit a bit from this test?
-        skillz_match_t * m;
-        for( m = server->skillz_matches; m != NULL; m = ( skillz_match_t * ) ( m->hh.next ) )
-        {
-        check( m->num_clients_in_match <= server->max_clients_per_match );
-        }
+        match_test_helper( server );
 
         for ( j = 0; j < max_clients[i]; ++j )
         {
