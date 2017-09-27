@@ -42,7 +42,7 @@
 #define NETCODE_SOCKET_IPV4         2
 
 #define NETCODE_CONNECT_TOKEN_PRIVATE_BYTES ( 1024 + 8 )
-#define NETCODE_CHALLENGE_TOKEN_BYTES 300
+#define NETCODE_CHALLENGE_TOKEN_BYTES ( 300 + 8 )
 #define NETCODE_VERSION_INFO_BYTES 13
 #define NETCODE_USER_DATA_BYTES 256
 #define NETCODE_MAX_PACKET_BYTES 1220
@@ -1154,6 +1154,7 @@ int netcode_read_connect_token_private( uint8_t * buffer, int buffer_length, str
 struct netcode_challenge_token_t
 {
     uint64_t client_id;
+    uint64_t skillz_match_id;
     uint8_t user_data[NETCODE_USER_DATA_BYTES];
 };
 
@@ -1172,6 +1173,8 @@ void netcode_write_challenge_token( struct netcode_challenge_token_t * challenge
     (void) start;
 
     netcode_write_uint64( &buffer, challenge_token->client_id );
+
+    netcode_write_uint64( &buffer, challenge_token->skillz_match_id );
 
     netcode_write_bytes( &buffer, challenge_token->user_data, NETCODE_USER_DATA_BYTES ); 
 
@@ -1228,9 +1231,11 @@ int netcode_read_challenge_token( uint8_t * buffer, int buffer_length, struct ne
     
     challenge_token->client_id = netcode_read_uint64( &buffer );
 
+    challenge_token->skillz_match_id = netcode_read_uint64( &buffer );
+
     netcode_read_bytes( &buffer, challenge_token->user_data, NETCODE_USER_DATA_BYTES );
 
-    netcode_assert( buffer - start == 8 + NETCODE_USER_DATA_BYTES );
+    netcode_assert( buffer - start == 16 + NETCODE_USER_DATA_BYTES );
 
     return NETCODE_OK;
 }
@@ -5407,45 +5412,47 @@ static void test_connect_token()
     check( memcmp( output_token.user_data, input_token.user_data, NETCODE_USER_DATA_BYTES ) == 0 );
 }
 
-//static void test_challenge_token()
-//{
-//    // generate a challenge token
-//
-//    struct netcode_challenge_token_t input_token;
-//
-//    input_token.client_id = TEST_CLIENT_ID;
-//    netcode_random_bytes( input_token.user_data, NETCODE_USER_DATA_BYTES );
-//
-//    // write it to a buffer
-//
-//    uint8_t buffer[NETCODE_CHALLENGE_TOKEN_BYTES];
-//
-//    netcode_write_challenge_token( &input_token, buffer, NETCODE_CHALLENGE_TOKEN_BYTES );
-//
-//    // encrypt the buffer
-//
-//    uint64_t sequence = 1000;
-//    uint8_t key[NETCODE_KEY_BYTES];
-//    netcode_generate_key( key );
-//
-//    check( netcode_encrypt_challenge_token( buffer, NETCODE_CHALLENGE_TOKEN_BYTES, sequence, key ) == NETCODE_OK );
-//
-//    // decrypt the buffer
-//
-//    check( netcode_decrypt_challenge_token( buffer, NETCODE_CHALLENGE_TOKEN_BYTES, sequence, key ) == NETCODE_OK );
-//
-//    // read the challenge token back in
-//
-//    struct netcode_challenge_token_t output_token;
-//
-//    check( netcode_read_challenge_token( buffer, NETCODE_CHALLENGE_TOKEN_BYTES, &output_token ) == NETCODE_OK );
-//
-//    // make sure that everything matches the original challenge token
-//
-//    check( output_token.client_id == input_token.client_id );
-//    check( memcmp( output_token.user_data, input_token.user_data, NETCODE_USER_DATA_BYTES ) == 0 );
-//}
-//
+static void test_challenge_token()
+{
+    // generate a challenge token
+
+    struct netcode_challenge_token_t input_token;
+
+    input_token.client_id = TEST_CLIENT_ID;
+    input_token.skillz_match_id = TEST_MATCH_ID;
+    netcode_random_bytes( input_token.user_data, NETCODE_USER_DATA_BYTES );
+
+    // write it to a buffer
+
+    uint8_t buffer[NETCODE_CHALLENGE_TOKEN_BYTES];
+
+    netcode_write_challenge_token( &input_token, buffer, NETCODE_CHALLENGE_TOKEN_BYTES );
+
+    // encrypt the buffer
+
+    uint64_t sequence = 1000;
+    uint8_t key[NETCODE_KEY_BYTES];
+    netcode_generate_key( key );
+
+    check( netcode_encrypt_challenge_token( buffer, NETCODE_CHALLENGE_TOKEN_BYTES, sequence, key ) == NETCODE_OK );
+
+    // decrypt the buffer
+
+    check( netcode_decrypt_challenge_token( buffer, NETCODE_CHALLENGE_TOKEN_BYTES, sequence, key ) == NETCODE_OK );
+
+    // read the challenge token back in
+
+    struct netcode_challenge_token_t output_token;
+
+    check( netcode_read_challenge_token( buffer, NETCODE_CHALLENGE_TOKEN_BYTES, &output_token ) == NETCODE_OK );
+
+    // make sure that everything matches the original challenge token
+
+    check( output_token.client_id == input_token.client_id );
+    check( output_token.skillz_match_id == input_token.skillz_match_id );
+    check( memcmp( output_token.user_data, input_token.user_data, NETCODE_USER_DATA_BYTES ) == 0 );
+}
+
 //static void test_connection_request_packet()
 //{
 //    // generate a connect token
@@ -8250,7 +8257,7 @@ void netcode_test()
         RUN_TEST( test_address );
         RUN_TEST( test_sequence );
         RUN_TEST( test_connect_token );
-        //RUN_TEST( test_challenge_token );
+        RUN_TEST( test_challenge_token );
         //RUN_TEST( test_connection_request_packet );
         //RUN_TEST( test_connection_denied_packet );
         //RUN_TEST( test_connection_challenge_packet );
