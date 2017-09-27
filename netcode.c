@@ -7941,7 +7941,7 @@ void test_skillz_add_two_clients_to_match()
 
     uint64_t token_sequence = 0;
 
-    // Client things.
+    // Create and connect a client.
     for( int i = 0; i < num_clients; ++i )
     {
         char client_address[NETCODE_MAX_ADDRESS_STRING_LENGTH];
