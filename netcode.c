@@ -7947,7 +7947,7 @@ void test_skillz_add_two_clients_to_match()
         char client_address[NETCODE_MAX_ADDRESS_STRING_LENGTH];
         sprintf( client_address, "[::]:%d", 50000 + i );
 
-        *(clients + i) = netcode_client_create_internal( client_address, time, network_simulator, NULL, NULL, NULL );
+        clients[i] = netcode_client_create_internal( client_address, time, network_simulator, NULL, NULL, NULL );
 
 
         check( clients[i] );
@@ -8021,9 +8021,6 @@ void test_skillz_add_two_clients_to_match()
     for( int i = 0; i < num_clients; ++i )
     {
         netcode_server_disconnect_client( server, i );
-    }
-    for( int i = 0; i < num_clients; ++i )
-    {
         netcode_client_destroy( clients[i] );
     }
 
@@ -8091,7 +8088,7 @@ void test_skillz_only_two_clients_per_match_with_three_attempting()
     free( clients );
 }
 
-// This test will need massive changes when we introduce removing matches based on dc time.
+// This test will need massive changes when we introduce removing matches based on disconnect time.
 void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
 {
     struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL );
