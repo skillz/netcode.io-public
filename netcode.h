@@ -55,7 +55,7 @@
 #define NETCODE_PLATFORM NETCODE_PLATFORM_UNIX
 #endif
 
-#define NETCODE_CONNECT_TOKEN_BYTES 2048
+#define NETCODE_CONNECT_TOKEN_BYTES ( 2048 + 8 )
 #define NETCODE_KEY_BYTES 32
 #define NETCODE_MAC_BYTES 16
 #define NETCODE_MAX_SERVERS_PER_CONNECT 32
@@ -103,7 +103,7 @@ extern "C" {
 // SKILLZ_TOURNAMENT_T
 typedef struct skillz_match_t
 {
-    int 			skillz_match_id;		/* key */
+    uint64_t 		skillz_match_id;		/* key */
     uint64_t 		clients_in_match[SKILLZ_MAX_CLIENTS_PER_MATCH];
     int 			num_clients_in_match;
     UT_hash_handle 	hh;						/* Makes this structure hashable!! */
@@ -166,6 +166,7 @@ int netcode_generate_connect_token( int num_server_addresses,
                                     int expire_seconds,
                                     int timeout_seconds, 
                                     uint64_t client_id, 
+                                    uint64_t skillz_match_id,
                                     uint64_t protocol_id, 
                                     uint64_t sequence, 
                                     NETCODE_CONST uint8_t * private_key, 
@@ -215,7 +216,7 @@ void * netcode_server_client_user_data( struct netcode_server_t * server, int cl
 
 void netcode_server_connect_disconnect_callback( struct netcode_server_t * server, void * context, void (*callback_function)(void*,int,int) );
 
-void netcode_server_connect_loopback_client( struct netcode_server_t * server, int client_index, uint64_t client_id, NETCODE_CONST uint8_t * user_data );
+void netcode_server_connect_loopback_client( struct netcode_server_t * server, int client_index, uint64_t client_id, uint64_t skillz_match_id, NETCODE_CONST uint8_t * user_data );
 
 void netcode_server_disconnect_loopback_client( struct netcode_server_t * server, int client_index );
 

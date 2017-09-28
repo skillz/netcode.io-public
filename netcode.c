@@ -41,10 +41,10 @@
 #define NETCODE_SOCKET_IPV6         1
 #define NETCODE_SOCKET_IPV4         2
 
-#define NETCODE_CONNECT_TOKEN_PRIVATE_BYTES 1024
-#define NETCODE_CHALLENGE_TOKEN_BYTES 300
+#define NETCODE_CONNECT_TOKEN_PRIVATE_BYTES ( 1024 + 8 )
+#define NETCODE_CHALLENGE_TOKEN_BYTES ( 300 + 8 )
 #define NETCODE_VERSION_INFO_BYTES 13
-#define NETCODE_USER_DATA_BYTES 256
+#define NETCODE_USER_DATA_BYTES ( 256 + 8 )
 #define NETCODE_MAX_PACKET_BYTES 1220
 #define NETCODE_MAX_PAYLOAD_BYTES 1200
 #define NETCODE_MAX_ADDRESS_STRING_LENGTH 256
@@ -918,6 +918,7 @@ int netcode_decrypt_aead( uint8_t * message, uint64_t message_length,
 struct netcode_connect_token_private_t
 {
     uint64_t client_id;
+    uint64_t skillz_match_id;
     int timeout_seconds;
     int num_server_addresses;
     struct netcode_address_t server_addresses[NETCODE_MAX_SERVERS_PER_CONNECT];
@@ -928,6 +929,7 @@ struct netcode_connect_token_private_t
 
 void netcode_generate_connect_token_private( struct netcode_connect_token_private_t * connect_token, 
                                              uint64_t client_id, 
+                                             uint64_t skillz_match_id,
                                              int timeout_seconds,
                                              int num_server_addresses, 
                                              struct netcode_address_t * server_addresses, 
@@ -940,6 +942,7 @@ void netcode_generate_connect_token_private( struct netcode_connect_token_privat
     netcode_assert( user_data );
 
     connect_token->client_id = client_id;
+    connect_token->skillz_match_id = skillz_match_id;
     connect_token->timeout_seconds = timeout_seconds;
     connect_token->num_server_addresses = num_server_addresses;
     
@@ -977,6 +980,8 @@ void netcode_write_connect_token_private( struct netcode_connect_token_private_t
     (void) start;
 
     netcode_write_uint64( &buffer, connect_token->client_id );
+
+    netcode_write_uint64( &buffer, connect_token->skillz_match_id );
 
     netcode_write_uint32( &buffer, connect_token->timeout_seconds );
 
@@ -1095,6 +1100,8 @@ int netcode_read_connect_token_private( uint8_t * buffer, int buffer_length, str
     
     connect_token->client_id = netcode_read_uint64( &buffer );
 
+    connect_token->skillz_match_id = netcode_read_uint64( &buffer );
+
     connect_token->timeout_seconds = (int) netcode_read_uint32( &buffer );
 
     connect_token->num_server_addresses = netcode_read_uint32( &buffer );
@@ -1147,6 +1154,7 @@ int netcode_read_connect_token_private( uint8_t * buffer, int buffer_length, str
 struct netcode_challenge_token_t
 {
     uint64_t client_id;
+    uint64_t skillz_match_id;
     uint8_t user_data[NETCODE_USER_DATA_BYTES];
 };
 
@@ -1165,6 +1173,8 @@ void netcode_write_challenge_token( struct netcode_challenge_token_t * challenge
     (void) start;
 
     netcode_write_uint64( &buffer, challenge_token->client_id );
+
+    netcode_write_uint64( &buffer, challenge_token->skillz_match_id );
 
     netcode_write_bytes( &buffer, challenge_token->user_data, NETCODE_USER_DATA_BYTES ); 
 
@@ -1221,9 +1231,11 @@ int netcode_read_challenge_token( uint8_t * buffer, int buffer_length, struct ne
     
     challenge_token->client_id = netcode_read_uint64( &buffer );
 
+    challenge_token->skillz_match_id = netcode_read_uint64( &buffer );
+
     netcode_read_bytes( &buffer, challenge_token->user_data, NETCODE_USER_DATA_BYTES );
 
-    netcode_assert( buffer - start == 8 + NETCODE_USER_DATA_BYTES );
+    netcode_assert( buffer - start == 8 + 8 + NETCODE_USER_DATA_BYTES );
 
     return NETCODE_OK;
 }
@@ -3497,7 +3509,7 @@ struct netcode_server_t
     uint64_t challenge_sequence;
     uint8_t challenge_key[NETCODE_KEY_BYTES];
     skillz_match_t * skillz_matches;
-    int skillz_match_id[NETCODE_MAX_CLIENTS];
+    uint64_t skillz_match_id[NETCODE_MAX_CLIENTS];
     int client_connected[NETCODE_MAX_CLIENTS];
     int client_timeout[NETCODE_MAX_CLIENTS];
     int client_loopback[NETCODE_MAX_CLIENTS];
@@ -3773,7 +3785,7 @@ void skillz_print_all_matches( struct netcode_server_t * server )
     {
         for( int i = 0; i < match->num_clients_in_match; ++i)
         {
-            netcode_printf( NETCODE_LOG_LEVEL_INFO, "match id: %d client id: %d clients in match: %d\n",
+            netcode_printf( NETCODE_LOG_LEVEL_INFO, "match id: %" PRIu64 "client id: %d clients in match: %d\n",
                     match->skillz_match_id, match->clients_in_match[i], match->num_clients_in_match );
         }
     }
@@ -3790,23 +3802,23 @@ void skillz_print_all_matches( struct netcode_server_t * server )
  */
 int skillz_match_disconnect( struct netcode_server_t * server, int client_index )
 {
-    int disconnect_match_id = server->skillz_match_id[client_index];
+    uint64_t disconnect_match_id = server->skillz_match_id[client_index];
 
     skillz_match_t * match;
-    HASH_FIND_INT( server->skillz_matches, &disconnect_match_id, match );
+    HASH_FIND( hh, server->skillz_matches, &disconnect_match_id, sizeof(uint64_t), match );
 
     if( !match )
     {
-        netcode_printf(NETCODE_LOG_LEVEL_INFO, "match %d did not exist\n",
+        netcode_printf(NETCODE_LOG_LEVEL_INFO, "match %" PRIu64 "did not exist\n",
                        disconnect_match_id);
         return 0;
     }
 
-    HASH_DEL( server->skillz_matches, match );
+    HASH_DELETE( hh, server->skillz_matches, match );
     // TODO: maybe check the match to see if one user is still connected, then disconnect them?
     free( match );
 
-    netcode_printf(NETCODE_LOG_LEVEL_INFO, "client %d disconnected from match %d\n",
+    netcode_printf(NETCODE_LOG_LEVEL_INFO, "client %d disconnected from match %" PRIu64 "\n",
                    server->client_id[client_index], disconnect_match_id);
 
     return 1;
@@ -4067,6 +4079,7 @@ void netcode_server_process_connection_request_packet( struct netcode_server_t *
 
     struct netcode_challenge_token_t challenge_token;
     challenge_token.client_id = connect_token_private.client_id;
+    challenge_token.skillz_match_id = connect_token_private.skillz_match_id;
     memcpy( challenge_token.user_data, connect_token_private.user_data, NETCODE_USER_DATA_BYTES );
 
     struct netcode_connection_challenge_packet_t challenge_packet;
@@ -4111,12 +4124,12 @@ int netcode_server_find_free_client_index( struct netcode_server_t * server )
  * @return If client was successfully added to a match or a match was created return 1.  Else return 0.
  *
  */
-int skillz_add_client_to_match(struct netcode_server_t * server, int skillz_match_id,
+int skillz_add_client_to_match(struct netcode_server_t * server, uint64_t skillz_match_id,
                                uint64_t client_id, int client_index)
 {
     skillz_match_t * match;
 
-    HASH_FIND_INT(server->skillz_matches, &skillz_match_id, match);
+    HASH_FIND( hh, server->skillz_matches, &skillz_match_id, sizeof(uint64_t), match);
 
     // If null then match does not exist.  Create match, add user.
     if ( match == NULL )
@@ -4131,11 +4144,11 @@ int skillz_add_client_to_match(struct netcode_server_t * server, int skillz_matc
         match->skillz_match_id = skillz_match_id;
         match->clients_in_match[0] = client_id;
         match->num_clients_in_match = 1;
-        HASH_ADD_INT( server->skillz_matches, skillz_match_id, match );
+        HASH_ADD( hh, server->skillz_matches, skillz_match_id, sizeof(uint64_t), match );
         server->skillz_match_id[client_index] = skillz_match_id;
 
-        netcode_printf( NETCODE_LOG_LEVEL_INFO, "match %d created\n", skillz_match_id );
-        netcode_printf( NETCODE_LOG_LEVEL_INFO, "client %d added to match %d\n", client_id, skillz_match_id );
+        netcode_printf( NETCODE_LOG_LEVEL_INFO, "match %" PRIu64 "created\n", skillz_match_id );
+        netcode_printf( NETCODE_LOG_LEVEL_INFO, "client %d added to match %" PRIu64 "\n", client_id, skillz_match_id );
 
         return 1;
     }
@@ -4158,7 +4171,7 @@ int skillz_add_client_to_match(struct netcode_server_t * server, int skillz_matc
         match->num_clients_in_match++;
         server->skillz_match_id[client_index] = skillz_match_id;
 
-        netcode_printf( NETCODE_LOG_LEVEL_INFO, "client %d added to match %d\n", client_id, skillz_match_id );
+        netcode_printf( NETCODE_LOG_LEVEL_INFO, "client %d added to match %" PRIu64 "\n", client_id, skillz_match_id );
 
         return 1;
     }
@@ -4170,6 +4183,7 @@ void netcode_server_connect_client( struct netcode_server_t * server,
                                     int client_index, 
                                     struct netcode_address_t * address, 
                                     uint64_t client_id, 
+                                    uint64_t skillz_match_id,
                                     int encryption_index,
                                     int timeout_seconds, 
                                     void * user_data )
@@ -4204,17 +4218,7 @@ void netcode_server_connect_client( struct netcode_server_t * server,
 
     char address_string[NETCODE_MAX_ADDRESS_STRING_LENGTH];
 
-    /* TODO: try to find a way to deliver match id. */
-    int test_id = 0;
-    if( server->num_connected_clients >= 3 )
-    {
-        test_id = 222;
-    }
-    else
-    {
-        test_id = 111;
-    }
-    if ( !skillz_add_client_to_match( server, test_id, client_id, client_index ) )
+    if ( !skillz_add_client_to_match( server, skillz_match_id, client_id, client_index ) )
     {
         netcode_printf( NETCODE_LOG_LEVEL_ERROR, "failed to add client %d to match %d\n",
                         client_id, 0);
@@ -4299,7 +4303,8 @@ void netcode_server_process_connection_response_packet( struct netcode_server_t 
 
     int timeout_seconds = netcode_encryption_manager_get_timeout( &server->encryption_manager, encryption_index );
 
-    netcode_server_connect_client( server, client_index, from, challenge_token.client_id, encryption_index, timeout_seconds, challenge_token.user_data );
+    netcode_server_connect_client( server, client_index, from, challenge_token.client_id,
+                                   challenge_token.skillz_match_id, encryption_index, timeout_seconds, challenge_token.user_data );
 }
 
 void netcode_server_process_packet( struct netcode_server_t * server, 
@@ -4708,7 +4713,7 @@ void netcode_server_connect_disconnect_callback( struct netcode_server_t * serve
     server->connect_disconnect_callback_function = callback_function;
 }
 
-void netcode_server_connect_loopback_client( struct netcode_server_t * server, int client_index, uint64_t client_id, NETCODE_CONST uint8_t * user_data )
+void netcode_server_connect_loopback_client( struct netcode_server_t * server, int client_index, uint64_t client_id, uint64_t skillz_match_id, NETCODE_CONST uint8_t * user_data )
 {
     netcode_assert( server );
     netcode_assert( client_index >= 0 );
@@ -4725,6 +4730,7 @@ void netcode_server_connect_loopback_client( struct netcode_server_t * server, i
     server->client_confirmed[client_index] = 1;
     server->client_encryption_index[client_index] = -1;
     server->client_id[client_index] = client_id;
+    server->skillz_match_id[client_index] = skillz_match_id;
     server->client_sequence[client_index] = 0;
     memset( &server->client_address[client_index], 0, sizeof( struct netcode_address_t ) );
     server->client_last_packet_send_time[client_index] = server->time;
@@ -4843,6 +4849,7 @@ int netcode_generate_connect_token( int num_server_addresses,
                                     int expire_seconds, 
                                     int timeout_seconds,
                                     uint64_t client_id, 
+                                    uint64_t skillz_match_id,
                                     uint64_t protocol_id, 
                                     uint64_t sequence, 
                                     NETCODE_CONST uint8_t * private_key, 
@@ -4871,7 +4878,7 @@ int netcode_generate_connect_token( int num_server_addresses,
     uint8_t user_data[NETCODE_USER_DATA_BYTES];
     netcode_random_bytes( user_data, NETCODE_USER_DATA_BYTES );
     struct netcode_connect_token_private_t connect_token_private;
-    netcode_generate_connect_token_private( &connect_token_private, client_id, timeout_seconds, num_server_addresses, parsed_server_addresses, user_data );
+    netcode_generate_connect_token_private( &connect_token_private, client_id, skillz_match_id, timeout_seconds, num_server_addresses, parsed_server_addresses, user_data );
 
     // write it to a buffer
 
@@ -5321,6 +5328,7 @@ static void test_address()
 
 #define TEST_PROTOCOL_ID            0x1122334455667788ULL
 #define TEST_CLIENT_ID              0x1ULL
+#define TEST_MATCH_ID				0x2ULL
 #define TEST_SERVER_PORT            40000
 #define TEST_CONNECT_TOKEN_EXPIRY   30
 #define TEST_TIMEOUT_SECONDS        15
@@ -5342,9 +5350,10 @@ static void test_connect_token()
 
     struct netcode_connect_token_private_t input_token;
 
-    netcode_generate_connect_token_private( &input_token, TEST_CLIENT_ID, TEST_TIMEOUT_SECONDS, 1, &server_address, user_data );
+    netcode_generate_connect_token_private( &input_token, TEST_CLIENT_ID, TEST_MATCH_ID, TEST_TIMEOUT_SECONDS, 1, &server_address, user_data );
 
     check( input_token.client_id == TEST_CLIENT_ID );
+    check( input_token.skillz_match_id == TEST_MATCH_ID );
     check( input_token.num_server_addresses == 1 );
     check( memcmp( input_token.user_data, user_data, NETCODE_USER_DATA_BYTES ) == 0 );
     check( netcode_address_equal( &input_token.server_addresses[0], &server_address ) );
@@ -5389,6 +5398,7 @@ static void test_connect_token()
     // make sure that everything matches the original connect token
 
     check( output_token.client_id == input_token.client_id );
+    check( output_token.skillz_match_id == input_token.skillz_match_id );
     check( output_token.timeout_seconds == input_token.timeout_seconds );
     check( output_token.num_server_addresses == input_token.num_server_addresses );
     check( netcode_address_equal( &output_token.server_addresses[0], &input_token.server_addresses[0] ) );
@@ -5404,6 +5414,7 @@ static void test_challenge_token()
     struct netcode_challenge_token_t input_token;
 
     input_token.client_id = TEST_CLIENT_ID;
+    input_token.skillz_match_id = TEST_MATCH_ID;
     netcode_random_bytes( input_token.user_data, NETCODE_USER_DATA_BYTES );
 
     // write it to a buffer
@@ -5433,6 +5444,7 @@ static void test_challenge_token()
     // make sure that everything matches the original challenge token
 
     check( output_token.client_id == input_token.client_id );
+    check( output_token.skillz_match_id == input_token.skillz_match_id );
     check( memcmp( output_token.user_data, input_token.user_data, NETCODE_USER_DATA_BYTES ) == 0 );
 }
 
@@ -5453,9 +5465,10 @@ static void test_connection_request_packet()
 
     struct netcode_connect_token_private_t input_token;
 
-    netcode_generate_connect_token_private( &input_token, TEST_CLIENT_ID, TEST_TIMEOUT_SECONDS, 1, &server_address, user_data );
+    netcode_generate_connect_token_private( &input_token, TEST_CLIENT_ID, TEST_MATCH_ID, TEST_TIMEOUT_SECONDS, 1, &server_address, user_data );
 
     check( input_token.client_id == TEST_CLIENT_ID );
+    check( input_token.skillz_match_id == TEST_MATCH_ID );
     check( input_token.num_server_addresses == 1 );
     check( memcmp( input_token.user_data, user_data, NETCODE_USER_DATA_BYTES ) == 0 );
     check( netcode_address_equal( &input_token.server_addresses[0], &server_address ) );
@@ -5801,9 +5814,10 @@ void test_connect_token_public()
 
     struct netcode_connect_token_private_t connect_token_private;
 
-    netcode_generate_connect_token_private( &connect_token_private, TEST_CLIENT_ID, TEST_TIMEOUT_SECONDS, 1, &server_address, user_data );
+    netcode_generate_connect_token_private( &connect_token_private, TEST_CLIENT_ID, TEST_MATCH_ID, TEST_TIMEOUT_SECONDS, 1, &server_address, user_data );
 
     check( connect_token_private.client_id == TEST_CLIENT_ID );
+    check( connect_token_private.skillz_match_id == TEST_MATCH_ID );
     check( connect_token_private.num_server_addresses == 1 );
     check( memcmp( connect_token_private.user_data, user_data, NETCODE_USER_DATA_BYTES ) == 0 );
     check( netcode_address_equal( &connect_token_private.server_addresses[0], &server_address ) );
@@ -6183,7 +6197,11 @@ void test_client_server_connect()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -6257,7 +6275,7 @@ void test_client_server_connect()
             netcode_server_free_packet( server, packet );
         }
 
-        check_num_clients_in_matches(server);
+        check_num_clients_in_matches( server );
 
         skillz_match_t * match;
         if ( client_num_packets_received >= 10 && server_num_packets_received >= 10 )
@@ -6265,16 +6283,20 @@ void test_client_server_connect()
             if ( netcode_server_client_connected( server, 0 ) )
             {
                 // Skillz test for match purge.
-                HASH_FIND_INT( server->skillz_matches,
-                               &( server->skillz_match_id[0] ),
-                               match);
+                HASH_FIND( hh,
+                           server->skillz_matches,
+                           &( server->skillz_match_id[0] ),
+                           sizeof(uint64_t),
+                           match);
                 check( match != NULL );
 
                 netcode_server_disconnect_client( server, 0 );
 
-                HASH_FIND_INT( server->skillz_matches,
-                               &( server->skillz_match_id[0] ),
-                               match );
+                HASH_FIND( hh,
+                           server->skillz_matches,
+                           &( server->skillz_match_id[0] ),
+                           sizeof(uint64_t),
+                           match );
                 check( match == NULL );
             }
         }
@@ -6325,7 +6347,11 @@ void test_client_server_keep_alive()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS,
+                                           skillz_match_id, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -6430,6 +6456,9 @@ void test_client_server_multiple_clients()
             uint64_t client_id = j;
             netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
+            uint64_t skillz_match_id = j;
+            netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
             NETCODE_CONST char * server_address = "[::1]:40000";
 
             uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
@@ -6439,6 +6468,7 @@ void test_client_server_multiple_clients()
                                                    TEST_CONNECT_TOKEN_EXPIRY, 
                                                    TEST_TIMEOUT_SECONDS,
                                                    client_id, 
+                                                   skillz_match_id,
                                                    TEST_PROTOCOL_ID, 
                                                    token_sequence++, 
                                                    private_key, 
@@ -6637,7 +6667,11 @@ void test_client_server_multiple_servers()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 3, server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 3, server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -6718,16 +6752,20 @@ void test_client_server_multiple_servers()
             if ( netcode_server_client_connected( server, 0 ) )
             {
                 // Skillz test for match purge.
-                HASH_FIND_INT( server->skillz_matches,
-                               &( server->skillz_match_id[0] ),
-                               match);
+                HASH_FIND( hh,
+                           server->skillz_matches,
+                           &( server->skillz_match_id[0] ),
+                           sizeof( uint64_t ),
+                           match);
                 check( match != NULL );
 
                 netcode_server_disconnect_client( server, 0 );
 
-                HASH_FIND_INT( server->skillz_matches,
-                               &( server->skillz_match_id[0] ),
-                               match);
+                HASH_FIND( hh,
+                           server->skillz_matches,
+                           &( server->skillz_match_id[0] ),
+                           sizeof( uint64_t ),
+                           match);
                 check( match == NULL );
             }
         }
@@ -6769,7 +6807,11 @@ void test_client_error_connect_token_expired()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, 0, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, 0, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -6802,6 +6844,9 @@ void test_client_error_invalid_connect_token()
 
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
+
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
 
     netcode_client_connect( client, connect_token );
 
@@ -6843,7 +6888,11 @@ void test_client_error_connection_timed_out()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -6923,7 +6972,11 @@ void test_client_error_connection_response_timeout()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -6984,7 +7037,11 @@ void test_client_error_connection_request_timeout()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &client_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -7045,7 +7102,11 @@ void test_client_error_connection_denied()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -7082,7 +7143,11 @@ void test_client_error_connection_denied()
     uint64_t client_id2 = 0;
     netcode_random_bytes( (uint8_t*) &client_id2, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id2, TEST_PROTOCOL_ID, 0, private_key, connect_token2 ) );
+    uint64_t skillz_match_id2 = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id2, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id2,
+                                           skillz_match_id2, TEST_PROTOCOL_ID, 0, private_key, connect_token2 ) );
 
     netcode_client_connect( client2, connect_token2 );
 
@@ -7145,7 +7210,11 @@ void test_client_side_disconnect()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -7226,7 +7295,11 @@ void test_server_side_disconnect()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -7313,7 +7386,11 @@ void test_client_reconnect()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -7367,7 +7444,8 @@ void test_client_reconnect()
 
     netcode_network_simulator_reset( network_simulator );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -7471,7 +7549,11 @@ void test_disable_timeout()
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
 
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, -1, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, -1, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( client, connect_token );
 
@@ -7606,7 +7688,11 @@ void test_loopback()
 
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
-    netcode_server_connect_loopback_client( server, 0, client_id, NULL );
+
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    netcode_server_connect_loopback_client( server, 0, client_id, skillz_match_id, NULL );
 
     check( netcode_server_client_loopback( server, 0 ) == 1 );
     check( netcode_server_client_connected( server, 0 ) == 1 );
@@ -7624,7 +7710,8 @@ void test_loopback()
 
     uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
-    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
+    check( netcode_generate_connect_token( 1, &server_address, TEST_CONNECT_TOKEN_EXPIRY, TEST_TIMEOUT_SECONDS, client_id,
+                                           skillz_match_id, TEST_PROTOCOL_ID, 0, private_key, connect_token ) );
 
     netcode_client_connect( regular_client, connect_token );
 
@@ -7773,7 +7860,7 @@ void test_loopback()
     // verify that we can reconnect the loopback client
 
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
-    netcode_server_connect_loopback_client( server, 0, client_id, NULL );
+    netcode_server_connect_loopback_client( server, 0, client_id, skillz_match_id, NULL );
 
     check( netcode_server_client_loopback( server, 0 ) == 1 );
     check( netcode_server_client_loopback( server, 1 ) == 0 );
@@ -7941,6 +8028,9 @@ void test_skillz_add_two_clients_to_match()
 
     uint64_t token_sequence = 0;
 
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
     // Create and connect a client.
     for( int i = 0; i < num_clients; ++i )
     {
@@ -7964,6 +8054,7 @@ void test_skillz_add_two_clients_to_match()
                                                TEST_CONNECT_TOKEN_EXPIRY,
                                                TEST_TIMEOUT_SECONDS,
                                                client_id,
+                                               skillz_match_id,
                                                TEST_PROTOCOL_ID,
                                                token_sequence++,
                                                private_key,
@@ -8012,10 +8103,9 @@ void test_skillz_add_two_clients_to_match()
 
     // Check if match was created with 2 clients.
 
-    int match_id = 111;
     skillz_match_t * match = NULL;
 
-    HASH_FIND_INT( server->skillz_matches, &match_id, match );
+    HASH_FIND( hh, server->skillz_matches, &skillz_match_id, sizeof(uint64_t), match );
     check( match->num_clients_in_match == num_clients );
 
     for( int i = 0; i < num_clients; ++i )
@@ -8025,7 +8115,7 @@ void test_skillz_add_two_clients_to_match()
     }
 
     // Check if match was removed and freed after disconnection.
-    HASH_FIND_INT( server->skillz_matches, &match_id, match );
+    HASH_FIND( hh, server->skillz_matches, &skillz_match_id, sizeof(uint64_t), match );
     check( match == NULL );
 
     netcode_server_stop( server );
@@ -8065,14 +8155,15 @@ void test_skillz_only_two_clients_per_match_with_three_attempting()
         server->client_id[i] = i;
     }
 
-    int match_id = 111;
+    uint64_t match_id = 111;
     for(int i = 0; i < num_clients; ++i )
     {
         skillz_add_client_to_match( server, match_id, server->client_id[i], i );
     }
 
     skillz_match_t * match = NULL;
-    HASH_FIND_INT( server->skillz_matches, &match_id, match  );
+    HASH_FIND( hh, server->skillz_matches, &match_id, sizeof(uint64_t), match  );
+    check( match != NULL );
     check( match->num_clients_in_match == num_clients - 1 );
 
     for( int i = 0; i < num_clients; ++i )
@@ -8130,11 +8221,22 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
 
         uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
 
+        uint64_t mid = 0;
+        if( i < 1 )
+        {
+            mid = 111;
+        }
+        else
+        {
+            mid = 222;
+        }
+
         check( netcode_generate_connect_token( 1,
                                                &server_address,
                                                TEST_CONNECT_TOKEN_EXPIRY,
                                                TEST_TIMEOUT_SECONDS,
                                                client_id,
+                                               mid,
                                                TEST_PROTOCOL_ID,
                                                token_sequence++,
                                                private_key,
@@ -8182,26 +8284,26 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
     }
 
     skillz_match_t * match;
-    int match1_id = 111;
-    int match2_id = 222;
+    uint64_t match1_id = 111;
+    uint64_t match2_id = 222;
 
     // See if match1 exists, disconnect client one, then check if the match is gone while the
     // other exists.
-    HASH_FIND_INT( server->skillz_matches, &match1_id, match );
+    HASH_FIND( hh, server->skillz_matches, &match1_id, sizeof(uint64_t), match );
     check( match->skillz_match_id == match1_id );
 
     netcode_server_disconnect_client( server, 0 );
 
-    HASH_FIND_INT( server->skillz_matches, &match1_id, match );
+    HASH_FIND( hh, server->skillz_matches, &match1_id, sizeof(uint64_t), match );
     check( match == NULL);
 
     // See if match2 exists, disconnect client three, then check if both of the matches are gone.
-    HASH_FIND_INT( server->skillz_matches, &match2_id, match );
+    HASH_FIND( hh, server->skillz_matches, &match2_id, sizeof(uint64_t), match );
     check( match->skillz_match_id == match2_id );
 
     netcode_server_disconnect_client(server, 2);
 
-    HASH_FIND_INT( server->skillz_matches, &match2_id, match );
+    HASH_FIND( hh, server->skillz_matches, &match2_id, sizeof(uint64_t), match );
     check( match == NULL);
 
 
