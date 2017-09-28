@@ -6624,7 +6624,7 @@ void test_client_server_multiple_clients()
         netcode_network_simulator_reset( network_simulator );
 
         check_num_clients_in_matches(server);
-
+      
         for ( j = 0; j < max_clients[i]; ++j )
         {
             netcode_client_destroy( client[j] );
@@ -8105,6 +8105,7 @@ void test_skillz_add_two_clients_to_match()
 
     // Check if match was created with 2 clients.
 
+
     skillz_match_t * match = NULL;
 
     HASH_FIND( hh, server->skillz_matches, &skillz_match_id, sizeof(uint64_t), match );
@@ -8118,6 +8119,7 @@ void test_skillz_add_two_clients_to_match()
     }
 
     // Check if match was removed and freed after disconnection.
+
     HASH_FIND( hh, server->skillz_matches, &skillz_match_id, sizeof(uint64_t), match );
     check( match == NULL );
 
@@ -8158,6 +8160,7 @@ void test_skillz_only_two_clients_per_match_with_three_attempting()
         server->client_id[i] = i;
     }
 
+
     uint64_t match_id = 111;
     for(int i = 0; i < num_clients; ++i )
     {
@@ -8165,6 +8168,7 @@ void test_skillz_only_two_clients_per_match_with_three_attempting()
     }
 
     skillz_match_t * match = NULL;
+
     HASH_FIND( hh, server->skillz_matches, &match_id, sizeof(uint64_t), match  );
     check( match != NULL );
     check( match->num_clients_in_match == num_clients - 1 );
@@ -8205,6 +8209,7 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
     check(clients);
 
     uint64_t token_sequence = 0;
+
 
     //  Creating and connecting clients.
     for( int i = 0; i < num_clients; ++i )
@@ -8297,6 +8302,7 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
 
     netcode_server_disconnect_client( server, 0 );
 
+
     HASH_FIND( hh, server->skillz_matches, &match1_id, sizeof(uint64_t), match );
     check( match == NULL);
 
@@ -8305,6 +8311,7 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
     check( match->skillz_match_id == match2_id );
 
     netcode_server_disconnect_client(server, 2);
+
 
     HASH_FIND( hh, server->skillz_matches, &match2_id, sizeof(uint64_t), match );
     check( match == NULL);
