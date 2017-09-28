@@ -8197,8 +8197,8 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
 {
     struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL );
 
-    network_simulator->latency_milliseconds = 250;
-    network_simulator->jitter_milliseconds = 250;
+    network_simulator->latency_milliseconds = 1000;
+    network_simulator->jitter_milliseconds = 0;
     network_simulator->packet_loss_percent = 5;
     network_simulator->duplicate_packet_percent = 10;
 
@@ -8235,7 +8235,7 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
         uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
 
         uint64_t mid = 0;
-        if( i < 1 )
+        if( i <= 1 )
         {
             mid = 111;
         }
