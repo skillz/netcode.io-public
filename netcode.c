@@ -4573,6 +4573,19 @@ uint64_t netcode_server_client_id( struct netcode_server_t * server, int client_
     return server->client_id[client_index];
 }
 
+uint64_t netcode_server_skillz_match_id( struct netcode_server_t * server, int client_index )
+{
+    netcode_assert( server );
+
+    if ( !server->running )
+        return 0;
+
+    if ( client_index < 0 || client_index >= server->max_clients )
+        return 0;
+
+    return server->skillz_match_id[client_index];
+}
+
 uint64_t netcode_server_next_packet_sequence( struct netcode_server_t * server, int client_index )
 {
     netcode_assert( client_index >= 0 );
@@ -5328,7 +5341,7 @@ static void test_address()
 
 #define TEST_PROTOCOL_ID            0x1122334455667788ULL
 #define TEST_CLIENT_ID              0x1ULL
-#define TEST_MATCH_ID				0x2ULL
+#define TEST_MATCH_ID			0x2ULL
 #define TEST_SERVER_PORT            40000
 #define TEST_CONNECT_TOKEN_EXPIRY   30
 #define TEST_TIMEOUT_SECONDS        15
