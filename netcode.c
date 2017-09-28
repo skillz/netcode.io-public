@@ -8203,7 +8203,7 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
 
     uint64_t token_sequence = 0;
 
-    // Client things.
+    // Create and connect clients.
     for( int i = 0; i < num_clients; ++i )
     {
         char client_address[NETCODE_MAX_ADDRESS_STRING_LENGTH];
