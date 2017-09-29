@@ -79,9 +79,13 @@ int main( int argc, char ** argv )
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
     printf( "client id is %.16" PRIx64 "\n", client_id );
 
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+    printf( "client is joining %" PRIu64 "\n", skillz_match_id );
+
     uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
 
-    if ( netcode_generate_connect_token( 1, &server_address, CONNECT_TOKEN_EXPIRY, CONNECT_TOKEN_TIMEOUT, client_id, PROTOCOL_ID, 0, private_key, connect_token ) != NETCODE_OK )
+    if ( netcode_generate_connect_token( 1, &server_address, CONNECT_TOKEN_EXPIRY, CONNECT_TOKEN_TIMEOUT, client_id, skillz_match_id, PROTOCOL_ID, 0, private_key, connect_token ) != NETCODE_OK )
     {
         printf( "error: failed to generate connect token\n" );
         return 1;
