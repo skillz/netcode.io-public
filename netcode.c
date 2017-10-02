@@ -3794,6 +3794,18 @@ void skillz_print_all_matches( struct netcode_server_t * server )
 }
 
 /**
+ * @brief skillz_match_delete
+ * @param server
+ * @param client_index
+ */
+void skillz_match_free( struct netcode_server_t * server, skillz_match_t * match, int client_index )
+{
+    HASH_DELETE( hh, server->skillz_matches, match );
+    server->skillz_match_id[client_index] = 0;
+    free( match );
+}
+
+/**
  * @brief skillz_match_disconnect
  * @param server
  * @param client_index
@@ -3803,9 +3815,12 @@ void skillz_print_all_matches( struct netcode_server_t * server )
  */
 int skillz_match_disconnect( struct netcode_server_t * server, int client_index )
 {
-    uint64_t disconnect_match_id = server->skillz_match_id[client_index];
+    netcode_assert( server->skillz_matches );
+    netcode_assert( server->skillz_match_id[client_index] );
 
     skillz_match_t * match;
+    uint64_t disconnect_match_id = server->skillz_match_id[client_index];
+
     HASH_FIND( hh, server->skillz_matches, &disconnect_match_id, sizeof(uint64_t), match );
 
     if( !match )
@@ -3815,9 +3830,14 @@ int skillz_match_disconnect( struct netcode_server_t * server, int client_index 
         return 0;
     }
 
-    HASH_DELETE( hh, server->skillz_matches, match );
-    // TODO: maybe check the match to see if one user is still connected, then disconnect them?
-    free( match );
+    netcode_assert( match->num_clients_in_match > 0 );
+    ++match->num_disconnects;
+    --match->num_clients_in_match;
+
+    if( match->num_clients_in_match <= 0 )
+    {
+        skillz_match_free( server, match, client_index );
+    }
 
     netcode_printf(NETCODE_LOG_LEVEL_INFO, "client %d disconnected from match %" PRIu64 "\n",
                    server->client_id[client_index], disconnect_match_id);
@@ -3871,10 +3891,6 @@ void netcode_server_disconnect_client_internal( struct netcode_server_t * server
 
     netcode_encryption_manager_remove_encryption_mapping( &server->encryption_manager, &server->client_address[client_index], server->time );
 
-    skillz_match_disconnect( server, client_index );
-    skillz_print_all_matches( server );
-    server->skillz_match_id[client_index] = 0;
-
     server->client_connected[client_index] = 0;
     server->client_confirmed[client_index] = 0;
     server->client_id[client_index] = 0;
@@ -3906,6 +3922,9 @@ void netcode_server_disconnect_client( struct netcode_server_t * server, int cli
 
     if ( server->client_loopback[client_index] )
         return;
+
+    skillz_match_disconnect( server, client_index );
+    skillz_print_all_matches( server );
 
     netcode_server_disconnect_client_internal( server, client_index, 1 );
 }
@@ -4145,6 +4164,9 @@ int skillz_add_client_to_match(struct netcode_server_t * server, uint64_t skillz
         match->skillz_match_id = skillz_match_id;
         match->clients_in_match[0] = client_id;
         match->num_clients_in_match = 1;
+        match->start_time = 0;
+        match->last_restart_time = 0;
+        match->max_disconnect_time = SKILLZ_MATCH_DISCONNECT_TIME;
         HASH_ADD( hh, server->skillz_matches, skillz_match_id, sizeof(uint64_t), match );
         server->skillz_match_id[client_index] = skillz_match_id;
 
@@ -4171,6 +4193,10 @@ int skillz_add_client_to_match(struct netcode_server_t * server, uint64_t skillz
         match->clients_in_match[match->num_clients_in_match] = client_id;
         match->num_clients_in_match++;
         server->skillz_match_id[client_index] = skillz_match_id;
+
+        if( match->start_time == 0)
+            match->start_time = server->time;
+        match->last_restart_time = server->time;
 
         netcode_printf( NETCODE_LOG_LEVEL_INFO, "client %d added to match %" PRIu64 "\n", client_id, skillz_match_id );
 
@@ -4548,6 +4574,39 @@ void netcode_server_check_for_timeouts( struct netcode_server_t * server )
     }
 }
 
+void skillz_check_disconnected_matches( struct netcode_server_t * server )
+{
+    netcode_assert( server );
+
+    skillz_match_t * current_match, * tmp;
+
+    if ( !server->running )
+        return;
+
+    HASH_ITER( hh, server->skillz_matches, current_match, tmp )
+    {
+        if( current_match->num_disconnects > 0 )
+        {
+            uint64_t client_id = 0;
+            if( current_match->last_restart_time + current_match->max_disconnect_time >= server->time )
+            {
+                int i;
+                for( i = 0; i < SKILLZ_MAX_CLIENTS_PER_MATCH; ++i )
+                {
+                    if( current_match->clients_in_match[i] != 0 )
+                        client_id = current_match->clients_in_match[i];
+                }
+
+                netcode_assert( client_id != 0 );
+
+                int client_index = netcode_server_find_client_index_by_id( server, client_id );
+                skillz_match_free( server, current_match, client_index );
+                netcode_server_disconnect_client_internal( server, client_index, 1 );
+            }
+        }
+    }
+}
+
 int netcode_server_client_connected( struct netcode_server_t * server, int client_index )
 {
     netcode_assert( server );
@@ -4718,6 +4777,7 @@ void netcode_server_update( struct netcode_server_t * server, double time )
     netcode_server_receive_packets( server );
     netcode_server_send_packets( server );
     netcode_server_check_for_timeouts( server );
+    skillz_check_disconnected_matches( server );
 }
 
 void netcode_server_connect_disconnect_callback( struct netcode_server_t * server, void * context, void (*callback_function)(void*,int,int) )
