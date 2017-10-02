@@ -4167,6 +4167,7 @@ int skillz_add_client_to_match(struct netcode_server_t * server, uint64_t skillz
         match->start_time = 0;
         match->last_restart_time = 0;
         match->max_disconnect_time = SKILLZ_MATCH_DISCONNECT_TIME;
+        match->num_disconnects = 0;
         HASH_ADD( hh, server->skillz_matches, skillz_match_id, sizeof(uint64_t), match );
         server->skillz_match_id[client_index] = skillz_match_id;
 
@@ -4588,7 +4589,7 @@ void skillz_check_disconnected_matches( struct netcode_server_t * server )
 
     HASH_ITER( hh, server->skillz_matches, current_match, tmp )
     {
-        if( current_match->num_disconnects > 0 && current_match->num_clients_in_match < SKILLZ_MAX_CLIENTS_PER_MATCH );
+        if( current_match->num_disconnects > 0 && current_match->num_clients_in_match < SKILLZ_MAX_CLIENTS_PER_MATCH )
         {
             uint64_t client_id = 0;
             if( current_match->last_restart_time + current_match->max_disconnect_time >= server->time )
@@ -5405,10 +5406,11 @@ static void test_address()
 
 #define TEST_PROTOCOL_ID            0x1122334455667788ULL
 #define TEST_CLIENT_ID              0x1ULL
-#define TEST_MATCH_ID			0x2ULL
+#define TEST_MATCH_ID				0x2ULL
 #define TEST_SERVER_PORT            40000
 #define TEST_CONNECT_TOKEN_EXPIRY   30
 #define TEST_TIMEOUT_SECONDS        15
+#define TEST_MATCH_EXPIRE			1.0
 
 static void test_connect_token()
 {
@@ -8118,7 +8120,6 @@ void test_skillz_add_two_clients_to_match()
 
         clients[i] = netcode_client_create_internal( client_address, time, network_simulator, NULL, NULL, NULL );
 
-
         check( clients[i] );
 
         uint64_t client_id = i;
@@ -8148,7 +8149,7 @@ void test_skillz_add_two_clients_to_match()
     {
         netcode_network_simulator_update( network_simulator, time );
 
-        for ( int j = 0; j < num_clients; ++j)
+        for ( j = 0; j < num_clients; ++j)
         {
             netcode_client_update( clients[j], time );
         }
@@ -8174,7 +8175,7 @@ void test_skillz_add_two_clients_to_match()
 
     check( netcode_server_num_connected_clients( server ) == num_clients );
 
-    for( j = 0; j < num_clients; ++j)
+    for( j = 0; j < num_clients; ++j )
     {
         check( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED );
         check( netcode_server_client_connected( server, j ) == 1 );
@@ -8202,7 +8203,7 @@ void test_skillz_add_two_clients_to_match()
 
     netcode_network_simulator_destroy( network_simulator );
 
-    free(clients);
+    free( clients );
 }
 
 void test_skillz_only_two_clients_per_match_with_three_attempting()
@@ -8260,7 +8261,7 @@ void test_skillz_only_two_clients_per_match_with_three_attempting()
 }
 
 // This test will need massive changes when we introduce removing matches based on disconnect time.
-void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
+void test_skillz_disconnect_one_match_then_the_other_with_four_clients()
 {
     struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL );
 
@@ -8333,7 +8334,7 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
     {
         netcode_network_simulator_update( network_simulator, time );
 
-        for ( int j = 0; j < num_clients; ++j)
+        for ( j = 0; j < num_clients; ++j)
         {
             netcode_client_update( clients[j], time );
         }
@@ -8373,20 +8374,22 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
     // other exists.
     HASH_FIND( hh, server->skillz_matches, &match1_id, sizeof(uint64_t), match );
     check( match->skillz_match_id == match1_id );
+    int prev_num_clients_in_match = match->num_clients_in_match;
 
     netcode_server_disconnect_client( server, 0 );
 
     HASH_FIND( hh, server->skillz_matches, &match1_id, sizeof(uint64_t), match );
-    check( match == NULL);
+    check( match->num_clients_in_match == prev_num_clients_in_match - 1 );
 
     // See if match2 exists, disconnect client three, then check if both of the matches are gone.
     HASH_FIND( hh, server->skillz_matches, &match2_id, sizeof(uint64_t), match );
     check( match->skillz_match_id == match2_id );
+    int prev_num_clients_in_match2 = match->num_clients_in_match;
 
     netcode_server_disconnect_client(server, 2);
 
     HASH_FIND( hh, server->skillz_matches, &match2_id, sizeof(uint64_t), match );
-    check( match == NULL);
+    check( match->num_clients_in_match = prev_num_clients_in_match2 - 1);
 
 
     // Cleanup
@@ -8404,6 +8407,119 @@ void test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients()
 
     free( clients );
 
+}
+
+void test_match_expire()
+{
+    struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL);
+
+    network_simulator->latency_milliseconds = 250;
+    network_simulator->jitter_milliseconds = 250;
+    network_simulator->packet_loss_percent = 5;
+    network_simulator->duplicate_packet_percent = 10;
+
+    double time = 0.0;
+    double delta_time = 1.0 / 10.0;
+
+    int num_clients = 2;
+
+    struct netcode_server_t * server = netcode_server_create_internal( "[::1]:40000",  TEST_PROTOCOL_ID, private_key, time, network_simulator, NULL, NULL, NULL );
+    check( server );
+    netcode_server_start( server, num_clients );
+
+    struct netcode_client_t ** clients = (struct netcode_client_t **) malloc( sizeof( struct netcode_client_t*) * num_clients );
+    check( clients );
+
+    uint64_t token_sequence = 0;
+
+    uint64_t skillz_match_id = 0;
+    netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
+
+    // Create and connect clients.
+    int i;
+    int j;
+    for( i = 0; i < num_clients; ++i )
+    {
+        char client_address[NETCODE_MAX_ADDRESS_STRING_LENGTH];
+        sprintf( client_address, "[::]:%d", 50000 + i );
+
+        clients[i] = netcode_client_create_internal( client_address, time, network_simulator, NULL, NULL, NULL );
+        check( clients[i] );
+
+        uint64_t client_id = i;
+        netcode_random_bytes( (uint8_t*) &client_id, 8 );
+
+        NETCODE_CONST char * server_address = "[::1]:40000";
+
+        uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
+
+        check( netcode_generate_connect_token( 1,
+                                               &server_address,
+                                               TEST_CONNECT_TOKEN_EXPIRY,
+                                               TEST_TIMEOUT_SECONDS,
+                                               client_id,
+                                               skillz_match_id,
+                                               TEST_PROTOCOL_ID,
+                                               token_sequence++,
+                                               private_key,
+                                               connect_token) );
+
+        netcode_client_connect( clients[i], connect_token );
+    }
+
+    // Connect clients.
+
+    while( 1 )
+    {
+        netcode_network_simulator_update( network_simulator, time );
+
+        for( j = 0; j < num_clients; ++j )
+        {
+            netcode_client_update( clients[j], time );
+        }
+
+        netcode_server_update( server, time );
+
+        int num_connected_clients = 0;
+
+        for( j = 0; j < num_clients; ++j )
+        {
+            if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
+                break;
+
+            if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_CONNECTED )
+                break;
+        }
+
+        if( num_connected_clients == num_clients )
+            break;
+
+        time += delta_time;
+    }
+
+    check( netcode_server_num_connected_clients( server ) == num_clients );
+
+    for( j = 0; j < num_clients; ++j )
+    {
+        check( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED );
+        check( netcode_server_client_connected( server, j ) == 1 );
+    }
+
+    skillz_match_t * match = NULL;
+    HASH_FIND( hh, server->skillz_matches, &skillz_match_id, sizeof(uint64_t), match );
+    check( match );
+    check( match->num_clients_in_match == num_clients );
+
+    //netcode_server_disconnect_client( server, i );
+
+    time += 2.0;
+
+    netcode_server_stop( server );
+    netcode_server_destroy( server );
+
+    netcode_network_simulator_destroy( network_simulator );
+
+    free( clients );
 }
 
 
@@ -8451,7 +8567,8 @@ void netcode_test()
         RUN_TEST( test_loopback );
         RUN_TEST( test_skillz_add_two_clients_to_match );
         RUN_TEST( test_skillz_only_two_clients_per_match_with_three_attempting );
-        RUN_TEST( test_skillz_disconnect_frees_one_match_then_the_other_with_four_clients );
+        RUN_TEST( test_skillz_disconnect_one_match_then_the_other_with_four_clients );
+        RUN_TEST( test_match_expire );
     }
 }
 
