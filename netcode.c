@@ -8149,7 +8149,7 @@ void test_skillz_add_two_clients_to_match()
     {
         netcode_network_simulator_update( network_simulator, time );
 
-        for ( j = 0; j < num_clients; ++j)
+        for ( j = 0; j < num_clients; ++j )
         {
             netcode_client_update( clients[j], time );
         }
@@ -8260,7 +8260,6 @@ void test_skillz_only_two_clients_per_match_with_three_attempting()
     free( clients );
 }
 
-// This test will need massive changes when we introduce removing matches based on disconnect time.
 void test_skillz_disconnect_one_match_then_the_other_with_four_clients()
 {
     struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL );
@@ -8487,8 +8486,8 @@ void test_match_expire()
             if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
                 break;
 
-            if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_CONNECTED )
-                break;
+            if( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED )
+                ++num_connected_clients;
         }
 
         if( num_connected_clients == num_clients )
@@ -8496,8 +8495,6 @@ void test_match_expire()
 
         time += delta_time;
     }
-
-    check( netcode_server_num_connected_clients( server ) == num_clients );
 
     for( j = 0; j < num_clients; ++j )
     {
@@ -8510,9 +8507,23 @@ void test_match_expire()
     check( match );
     check( match->num_clients_in_match == num_clients );
 
-    //netcode_server_disconnect_client( server, i );
-
+    netcode_server_disconnect_client( server, 0 );
     time += 2.0;
+    for( i = 0; i < num_clients; ++i )
+        netcode_client_update( clients[i], time );
+    netcode_server_update( server, time );
+
+    printf("%f\n", time);
+
+    HASH_FIND( hh, server->skillz_matches, &skillz_match_id, sizeof(uint64_t), match );
+    check( match == NULL );
+
+    netcode_server_disconnect_client( server, 1 );
+
+    for( i = 0; i < num_clients; ++i )
+    {
+        netcode_client_destroy( clients[i] );
+    }
 
     netcode_server_stop( server );
     netcode_server_destroy( server );
