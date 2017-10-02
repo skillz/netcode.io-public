@@ -4574,6 +4574,9 @@ void netcode_server_check_for_timeouts( struct netcode_server_t * server )
     }
 }
 
+// Disconnect a client and destroy a match if:
+// A client has disconnected, there are less than the max number of clients in the match,
+// and if the match has existed with a disconnect for longer than SKILLZ_MATCH_DISCONNECT_TIME.
 void skillz_check_disconnected_matches( struct netcode_server_t * server )
 {
     netcode_assert( server );
@@ -4585,7 +4588,7 @@ void skillz_check_disconnected_matches( struct netcode_server_t * server )
 
     HASH_ITER( hh, server->skillz_matches, current_match, tmp )
     {
-        if( current_match->num_disconnects > 0 )
+        if( current_match->num_disconnects > 0 && current_match->num_clients_in_match < SKILLZ_MAX_CLIENTS_PER_MATCH );
         {
             uint64_t client_id = 0;
             if( current_match->last_restart_time + current_match->max_disconnect_time >= server->time )
