@@ -5406,11 +5406,11 @@ static void test_address()
 
 #define TEST_PROTOCOL_ID            0x1122334455667788ULL
 #define TEST_CLIENT_ID              0x1ULL
-#define TEST_MATCH_ID			0x2ULL
+#define TEST_MATCH_ID		    0x2ULL
 #define TEST_SERVER_PORT            40000
 #define TEST_CONNECT_TOKEN_EXPIRY   30
 #define TEST_TIMEOUT_SECONDS        15
-#define TEST_MATCH_EXPIRE	1.0
+#define TEST_MATCH_EXPIRE	    1.0
 
 static void test_connect_token()
 {
