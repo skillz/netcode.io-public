@@ -4195,7 +4195,7 @@ int skillz_add_client_to_match(struct netcode_server_t * server, uint64_t skillz
         match->num_clients_in_match++;
         server->skillz_match_id[client_index] = skillz_match_id;
 
-        if( match->start_time == 0)
+        if( match->start_time == 0 )
             match->start_time = server->time;
         match->last_restart_time = server->time;
 
@@ -5410,7 +5410,7 @@ static void test_address()
 #define TEST_SERVER_PORT            40000
 #define TEST_CONNECT_TOKEN_EXPIRY   30
 #define TEST_TIMEOUT_SECONDS        15
-#define TEST_MATCH_EXPIRE		1.0
+#define TEST_MATCH_EXPIRE	1.0
 
 static void test_connect_token()
 {
@@ -8388,7 +8388,7 @@ void test_skillz_disconnect_one_match_then_the_other_with_four_clients()
     netcode_server_disconnect_client(server, 2);
 
     HASH_FIND( hh, server->skillz_matches, &match2_id, sizeof(uint64_t), match );
-    check( match->num_clients_in_match = prev_num_clients_in_match2 - 1);
+    check( match->num_clients_in_match = prev_num_clients_in_match2 - 1 );
 
 
     // Cleanup
@@ -8410,7 +8410,7 @@ void test_skillz_disconnect_one_match_then_the_other_with_four_clients()
 
 void test_match_expire()
 {
-    struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL);
+    struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL );
 
     network_simulator->latency_milliseconds = 250;
     network_simulator->jitter_milliseconds = 250;
@@ -8533,7 +8533,7 @@ void test_match_expire()
 
 void test_client_match_reconnection_within_window()
 {
-    struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL);
+    struct netcode_network_simulator_t * network_simulator = netcode_network_simulator_create( NULL, NULL, NULL );
 
     network_simulator->latency_milliseconds = 250;
     network_simulator->jitter_milliseconds = 250;

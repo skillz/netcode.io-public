@@ -38,3 +38,8 @@ docs
 
 valgrind/*
 docker/*
+
+*.config
+*.creator
+*.files
+*.includes

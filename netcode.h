@@ -100,7 +100,7 @@ extern "C" {
 
 #define SKILLZ_MAX_CLIENTS_PER_MATCH 	2
 #define SKILLZ_MATCH_DISCONNECT_TIME 	10.0
-#define SKILLZ_MAX_MATCH_DISCONNECT		5
+#define SKILLZ_MAX_MATCH_DISCONNECT	5
 
 // SKILLZ_MATCH_T: a struct for each match.
 typedef struct skillz_match_t
