@@ -3796,7 +3796,10 @@ void skillz_print_all_matches( struct netcode_server_t * server )
 /**
  * @brief skillz_match_delete
  * @param server
+ * @param match
  * @param client_index
+ *
+ * This function is only for freeing a match and removing its id from the list in server.
  */
 void skillz_match_free( struct netcode_server_t * server, skillz_match_t * match, int client_index )
 {
@@ -3811,7 +3814,7 @@ void skillz_match_free( struct netcode_server_t * server, skillz_match_t * match
  * @param client_index
  * @return bool if success.
  *
- * Removes the match from the hash table, frees the memeory.
+ * Removes a client from a match.  If no clients are in the match after removal, free the match.
  */
 int skillz_match_disconnect( struct netcode_server_t * server, int client_index )
 {
@@ -3833,6 +3836,7 @@ int skillz_match_disconnect( struct netcode_server_t * server, int client_index 
     netcode_assert( match->num_clients_in_match > 0 );
     ++match->num_disconnects;
     --match->num_clients_in_match;
+    server->skillz_match_id[client_index] = 0;
 
     if( match->num_clients_in_match <= 0 )
     {
