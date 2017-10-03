@@ -5406,11 +5406,11 @@ static void test_address()
 
 #define TEST_PROTOCOL_ID            0x1122334455667788ULL
 #define TEST_CLIENT_ID              0x1ULL
-#define TEST_MATCH_ID				0x2ULL
+#define TEST_MATCH_ID		0x2ULL
 #define TEST_SERVER_PORT            40000
 #define TEST_CONNECT_TOKEN_EXPIRY   30
 #define TEST_TIMEOUT_SECONDS        15
-#define TEST_MATCH_EXPIRE			1.0
+#define TEST_MATCH_EXPIRE	1.0
 
 static void test_connect_token()
 {
@@ -8333,7 +8333,7 @@ void test_skillz_disconnect_one_match_then_the_other_with_four_clients()
     {
         netcode_network_simulator_update( network_simulator, time );
 
-        for ( j = 0; j < num_clients; ++j)
+        for ( j = 0; j < num_clients; ++j )
         {
             netcode_client_update( clients[j], time );
         }
