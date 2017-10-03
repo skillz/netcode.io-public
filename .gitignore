@@ -35,3 +35,6 @@ c/docker/netcode.io
 c/valgrind/netcode.io
 docs
 *.exe
+
+valgrind/*
+docker/*
