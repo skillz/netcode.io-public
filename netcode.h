@@ -112,7 +112,7 @@ typedef struct skillz_match_t
     int		num_disconnects;
     double		max_disconnect_time;
     double		start_time;
-    double		last_restart_time;
+    double		last_client_connect_time;
     UT_hash_handle 	hh;						/* Makes this structure hashable!! */
 
 } skillz_match_t;
