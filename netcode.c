@@ -3834,6 +3834,16 @@ int skillz_match_disconnect( struct netcode_server_t * server, int client_index 
     }
 
     netcode_assert( match->num_clients_in_match > 0 );
+
+    int i = 0;
+    for( i = 0; i < server->max_clients_per_match; ++i )
+    {
+        if( match->clients_in_match[i] == server->client_id[client_index] )
+        {
+            match->clients_in_match[i] = 0;
+        }
+    }
+
     ++match->num_disconnects;
     --match->num_clients_in_match;
     server->skillz_match_id[client_index] = 0;
@@ -3895,6 +3905,9 @@ void netcode_server_disconnect_client_internal( struct netcode_server_t * server
 
     netcode_encryption_manager_remove_encryption_mapping( &server->encryption_manager, &server->client_address[client_index], server->time );
 
+    skillz_match_disconnect( server, client_index );
+    skillz_print_all_matches( server );
+
     server->client_connected[client_index] = 0;
     server->client_confirmed[client_index] = 0;
     server->client_id[client_index] = 0;
@@ -3926,9 +3939,6 @@ void netcode_server_disconnect_client( struct netcode_server_t * server, int cli
 
     if ( server->client_loopback[client_index] )
         return;
-
-    skillz_match_disconnect( server, client_index );
-    skillz_print_all_matches( server );
 
     netcode_server_disconnect_client_internal( server, client_index, 1 );
 }
@@ -4167,6 +4177,7 @@ int skillz_add_client_to_match(struct netcode_server_t * server, uint64_t skillz
         }
         match->skillz_match_id = skillz_match_id;
         match->clients_in_match[0] = client_id;
+        match->clients_in_match[1] = 0;
         match->num_clients_in_match = 1;
         match->start_time = 0;
         match->last_restart_time = 0;
@@ -4608,7 +4619,7 @@ void skillz_check_disconnected_matches( struct netcode_server_t * server )
                 netcode_assert( client_id != 0 );
 
                 int client_index = netcode_server_find_client_index_by_id( server, client_id );
-                skillz_match_free( server, current_match, client_index );
+                netcode_assert( client_index != -1 );
                 netcode_server_disconnect_client_internal( server, client_index, 1 );
             }
         }
@@ -8332,26 +8343,25 @@ void test_skillz_disconnect_one_match_then_the_other_with_four_clients()
 
     // Connect the four clients.
 
-    int j = 0;
     while( 1 )
     {
         netcode_network_simulator_update( network_simulator, time );
 
-        for ( j = 0; j < num_clients; ++j )
+        for ( i = 0; i < num_clients; ++i )
         {
-            netcode_client_update( clients[j], time );
+            netcode_client_update( clients[i], time );
         }
 
         netcode_server_update( server, time );
 
         int num_connected_clients = 0;
 
-        for( j = 0; j < num_clients; ++j )
+        for( i = 0; i < num_clients; ++i )
         {
-            if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
+            if( netcode_client_state( clients[i] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
                 break;
 
-            if( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED )
+            if( netcode_client_state( clients[i] ) == NETCODE_CLIENT_STATE_CONNECTED )
                 num_connected_clients++;
         }
 
@@ -8363,10 +8373,10 @@ void test_skillz_disconnect_one_match_then_the_other_with_four_clients()
 
     check( netcode_server_num_connected_clients( server ) == num_clients );
 
-    for( j = 0; j < num_clients; ++j)
+    for( i = 0; i < num_clients; ++i)
     {
-        check( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED );
-        check( netcode_server_client_connected( server, j ) == 1 );
+        check( netcode_client_state( clients[i] ) == NETCODE_CLIENT_STATE_CONNECTED );
+        check( netcode_server_client_connected( server, i ) == 1 );
     }
 
     skillz_match_t * match;
@@ -8440,7 +8450,6 @@ void test_match_expire()
 
     // Create and connect clients.
     int i;
-    int j;
     for( i = 0; i < num_clients; ++i )
     {
         char client_address[NETCODE_MAX_ADDRESS_STRING_LENGTH];
@@ -8476,21 +8485,21 @@ void test_match_expire()
     {
         netcode_network_simulator_update( network_simulator, time );
 
-        for( j = 0; j < num_clients; ++j )
+        for( i = 0; i < num_clients; ++i )
         {
-            netcode_client_update( clients[j], time );
+            netcode_client_update( clients[i], time );
         }
 
         netcode_server_update( server, time );
 
         int num_connected_clients = 0;
 
-        for( j = 0; j < num_clients; ++j )
+        for( i = 0; i < num_clients; ++i )
         {
-            if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
+            if( netcode_client_state( clients[i] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
                 break;
 
-            if( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED )
+            if( netcode_client_state( clients[i] ) == NETCODE_CLIENT_STATE_CONNECTED )
                 ++num_connected_clients;
         }
 
@@ -8500,10 +8509,10 @@ void test_match_expire()
         time += delta_time;
     }
 
-    for( j = 0; j < num_clients; ++j )
+    for( i = 0; i < num_clients; ++i )
     {
-        check( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED );
-        check( netcode_server_client_connected( server, j ) == 1 );
+        check( netcode_client_state( clients[i] ) == NETCODE_CLIENT_STATE_CONNECTED );
+        check( netcode_server_client_connected( server, i ) == 1 );
     }
 
     skillz_match_t * match = NULL;
@@ -8563,7 +8572,6 @@ void test_client_match_reconnection_within_window()
 
     // Create and connect clients.
     int i;
-    int j;
     for( i = 0; i < num_clients; ++i )
     {
         char client_address[NETCODE_MAX_ADDRESS_STRING_LENGTH];
@@ -8599,21 +8607,21 @@ void test_client_match_reconnection_within_window()
     {
         netcode_network_simulator_update( network_simulator, time );
 
-        for( j = 0; j < num_clients; ++j )
+        for( i = 0; i < num_clients; ++i )
         {
-            netcode_client_update( clients[j], time );
+            netcode_client_update( clients[i], time );
         }
 
         netcode_server_update( server, time );
 
         int num_connected_clients = 0;
 
-        for( j = 0; j < num_clients; ++j )
+        for( i = 0; i < num_clients; ++i )
         {
-            if( netcode_client_state( clients[j] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
+            if( netcode_client_state( clients[i] ) <= NETCODE_CLIENT_STATE_DISCONNECTED )
                 break;
 
-            if( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED )
+            if( netcode_client_state( clients[i] ) == NETCODE_CLIENT_STATE_CONNECTED )
                 ++num_connected_clients;
         }
 
@@ -8623,10 +8631,10 @@ void test_client_match_reconnection_within_window()
         time += delta_time;
     }
 
-    for( j = 0; j < num_clients; ++j )
+    for( i = 0; i < num_clients; ++i )
     {
-        check( netcode_client_state( clients[j] ) == NETCODE_CLIENT_STATE_CONNECTED );
-        check( netcode_server_client_connected( server, j ) == 1 );
+        check( netcode_client_state( clients[i] ) == NETCODE_CLIENT_STATE_CONNECTED );
+        check( netcode_server_client_connected( server, i ) == 1 );
     }
 
     skillz_match_t * match = NULL;

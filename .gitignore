@@ -17,6 +17,13 @@ Makefile
 *.7z
 *.zip
 *.tar.gz
+valgrind/*
+docker/*
+*.config
+*.creator
+*.files
+*.includes
+*.user
 
 # Sublime text
 *.sublime-project
@@ -36,10 +43,3 @@ c/valgrind/netcode.io
 docs
 *.exe
 
-valgrind/*
-docker/*
-
-*.config
-*.creator
-*.files
-*.includes

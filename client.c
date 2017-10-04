@@ -79,9 +79,13 @@ int main( int argc, char ** argv )
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
     printf( "client id is %.16" PRIx64 "\n", client_id );
 
+    /*
     uint64_t skillz_match_id = 0;
     netcode_random_bytes( (uint8_t*) &skillz_match_id, 8 );
     printf( "client is joining %" PRIu64 "\n", skillz_match_id );
+    */
+
+    uint64_t skillz_match_id = 111;
 
     uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
 
