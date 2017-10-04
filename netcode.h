@@ -98,14 +98,21 @@ extern "C" {
   * Skillz Definitions
   **/
 
-#define SKILLZ_MAX_CLIENTS_PER_MATCH 2
+#define SKILLZ_MAX_CLIENTS_PER_MATCH 	2
+#define SKILLZ_MATCH_DISCONNECT_TIME 	10.0
+#define SKILLZ_MAX_MATCH_DISCONNECT	5
 
-// SKILLZ_TOURNAMENT_T
+// SKILLZ_MATCH_T: a struct for each match.
 typedef struct skillz_match_t
 {
     uint64_t 		skillz_match_id;		/* key */
     uint64_t 		clients_in_match[SKILLZ_MAX_CLIENTS_PER_MATCH];
     int 		num_clients_in_match;
+    int		max_num_disconnects;
+    int		num_disconnects;
+    double		max_disconnect_time;
+    double		start_time;
+    double		last_client_connect_time;
     UT_hash_handle 	hh;						/* Makes this structure hashable!! */
 
 } skillz_match_t;
